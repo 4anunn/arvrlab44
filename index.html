@@ -2,31 +2,14 @@
 <html lang="mn">
 
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>WebAR — iPhone AR</title>
+  <title>AR — Гадаргуу + Marker</title>
 
-  <!-- Google Fonts -->
-  <link
-    href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Clash+Display:wght@500;700&display=swap"
-    rel="stylesheet" />
-
-  <!-- model-viewer (Google) — iOS AR Quick Look + Android Scene Viewer -->
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
-    :root {
-      --ink: #0d0d12;
-      --surface: #16161f;
-      --card: #1c1c28;
-      --line: #2a2a3a;
-      --gold: #e8c97a;
-      --teal: #5de8c8;
-      --soft: #a0a0c0;
-      --text: #eeeef8;
-    }
-
     * {
       margin: 0;
       padding: 0;
@@ -34,482 +17,747 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    html,
     body {
-      height: 100%;
-      background: var(--ink);
-      color: var(--text);
-      font-family: 'DM Mono', monospace;
-      overflow-x: hidden;
-    }
-
-    /* ── Header ── */
-    header {
-      padding: 52px 24px 20px;
-      position: relative;
+      background: #000;
+      font-family: 'Helvetica Neue', sans-serif;
       overflow: hidden;
     }
 
-    header::before {
-      content: '';
-      position: absolute;
-      top: -60px;
-      left: -60px;
-      width: 280px;
-      height: 280px;
-      background: radial-gradient(circle, rgba(93, 232, 200, 0.08) 0%, transparent 70%);
+    /* ── Scan overlay (marker олдоогүй үед) ── */
+    #scan-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
       pointer-events: none;
+      transition: opacity 0.5s;
     }
 
-    .eyebrow {
-      font-size: 0.6rem;
-      letter-spacing: 0.2em;
-      color: var(--teal);
-      text-transform: uppercase;
-      margin-bottom: 8px;
+    /* Reticle — гадаргуу хайж буй дугуй */
+    #reticle-wrap {
+      position: absolute;
+      left: 50%;
+      top: 55%;
+      transform: translate(-50%, -50%);
     }
 
-    h1 {
-      font-family: 'Clash Display', sans-serif;
-      font-size: 1.9rem;
-      font-weight: 700;
-      line-height: 1.1;
-      letter-spacing: -0.02em;
-    }
-
-    h1 em {
-      font-style: normal;
-      color: var(--gold);
-    }
-
-    .sub {
-      margin-top: 8px;
-      font-size: 0.65rem;
-      color: var(--soft);
-      line-height: 1.6;
-    }
-
-    /* ── How it works banner ── */
-    .how {
-      margin: 0 24px 24px;
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-left: 3px solid var(--teal);
-      border-radius: 10px;
-      padding: 14px 16px;
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-    }
-
-    .how-icon {
-      font-size: 1.4rem;
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-
-    .how-text h3 {
-      font-family: 'Clash Display', sans-serif;
-      font-size: 0.8rem;
-      color: var(--teal);
-      margin-bottom: 4px;
-    }
-
-    .how-text p {
-      font-size: 0.62rem;
-      color: var(--soft);
-      line-height: 1.55;
-    }
-
-    /* ── Object grid ── */
-    .section-label {
-      padding: 0 24px 12px;
-      font-size: 0.58rem;
-      letter-spacing: 0.18em;
-      color: var(--soft);
-      text-transform: uppercase;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      padding: 0 24px 24px;
-    }
-
-    .obj-card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      overflow: hidden;
-      cursor: pointer;
-      transition: border-color 0.2s, transform 0.15s;
-      position: relative;
-    }
-
-    .obj-card:active {
-      transform: scale(0.97);
-    }
-
-    .obj-card.selected {
-      border-color: var(--gold);
-    }
-
-    .obj-card .preview {
-      height: 130px;
+    .reticle-outer {
+      width: 180px;
+      height: 60px;
+      border: 2px solid rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 3.2rem;
-      background: var(--surface);
+      animation: reticle-pulse 2s ease-in-out infinite;
       position: relative;
     }
 
-    .obj-card .preview::after {
+    .reticle-inner {
+      width: 8px;
+      height: 8px;
+      background: #fff;
+      border-radius: 50%;
+    }
+
+    .reticle-outer::before,
+    .reticle-outer::after {
       content: '';
       position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at center, rgba(232, 201, 122, 0.06) 0%, transparent 70%);
+      width: 14px;
+      height: 2px;
+      background: #fff;
     }
 
-    .obj-card .info {
-      padding: 10px 12px 12px;
+    .reticle-outer::before {
+      left: -18px;
     }
 
-    .obj-card .name {
-      font-family: 'Clash Display', sans-serif;
-      font-size: 0.82rem;
-      font-weight: 600;
-      margin-bottom: 2px;
+    .reticle-outer::after {
+      right: -18px;
     }
 
-    .obj-card .desc {
-      font-size: 0.58rem;
-      color: var(--soft);
+    @keyframes reticle-pulse {
+
+      0%,
+      100% {
+        transform: scaleX(1) scaleY(1);
+        opacity: 0.7;
+      }
+
+      50% {
+        transform: scaleX(1.08) scaleY(1.15);
+        opacity: 1;
+      }
     }
 
-    .selected-badge {
-      display: none;
+    /* Scan hint text */
+    #scan-hint {
       position: absolute;
-      top: 8px;
-      right: 8px;
-      background: var(--gold);
-      color: #000;
-      font-size: 0.55rem;
-      font-weight: 700;
-      padding: 2px 7px;
+      left: 50%;
+      top: calc(55% + 55px);
+      transform: translateX(-50%);
+      text-align: center;
+    }
+
+    #scan-hint p {
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      line-height: 1.6;
+    }
+
+    #scan-hint .scan-label {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 3px 12px;
       border-radius: 99px;
+      font-size: 0.6rem;
+      color: #fff;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      animation: blink 1.4s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    /* Corner guides */
+    .corner-guide {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-color: rgba(255, 255, 255, 0.5);
+      border-style: solid;
+    }
+
+    .cg-tl {
+      top: 20px;
+      left: 20px;
+      border-width: 2px 0 0 2px;
+    }
+
+    .cg-tr {
+      top: 20px;
+      right: 20px;
+      border-width: 2px 2px 0 0;
+    }
+
+    .cg-bl {
+      bottom: 90px;
+      left: 20px;
+      border-width: 0 0 2px 2px;
+    }
+
+    .cg-br {
+      bottom: 90px;
+      right: 20px;
+      border-width: 0 2px 2px 0;
+    }
+
+    /* Marker found toast */
+    #found-toast {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-80px);
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 99px;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.4s cubic-bezier(.34, 1.56, .64, 1);
+    }
+
+    #found-toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #found-toast .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 8px #4ade80;
+    }
+
+    #found-toast span {
+      color: #fff;
+      font-size: 0.7rem;
       letter-spacing: 0.08em;
     }
 
-    .obj-card.selected .selected-badge {
-      display: block;
+    /* ── Bottom controls ── */
+    #controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 150;
+      padding: 0 16px 32px;
+      background: linear-gradient(0deg, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
     }
 
-    /* ── model-viewer container ── */
-    .viewer-wrap {
-      margin: 0 24px 20px;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid var(--line);
-      background: var(--surface);
-      position: relative;
-    }
-
-    model-viewer {
-      width: 100%;
-      height: 300px;
-      background: transparent;
-      --poster-color: transparent;
-    }
-
-    /* AR button override */
-    model-viewer::part(ar-button) {
-      display: none;
-      /* custom button-г ашиглана */
-    }
-
-    /* ── AR launch button ── */
-    .ar-btn {
+    /* Model selector */
+    #model-tabs {
       display: flex;
-      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    .model-tab {
+      padding: 8px 18px;
+      border-radius: 99px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(8px);
+    }
+
+    .model-tab:active {
+      transform: scale(0.95);
+    }
+
+    .model-tab.active {
+      background: #fff;
+      color: #000;
+      border-color: #fff;
+      font-weight: 600;
+    }
+
+    /* Rotate toggle */
+    #rotate-row {
+      display: flex;
       justify-content: center;
       gap: 10px;
-      margin: 0 24px 16px;
-      padding: 17px;
-      background: linear-gradient(135deg, var(--gold) 0%, #d4a843 100%);
-      color: #0d0d12;
-      font-family: 'Clash Display', sans-serif;
-      font-size: 1rem;
-      font-weight: 700;
-      border: none;
-      border-radius: 14px;
-      cursor: pointer;
-      letter-spacing: 0.02em;
-      transition: opacity 0.2s, transform 0.15s;
-      text-decoration: none;
-      width: calc(100% - 48px);
     }
 
-    .ar-btn:active {
-      transform: scale(0.98);
-      opacity: 0.9;
-    }
-
-    .ar-btn .ar-icon {
-      font-size: 1.3rem;
-    }
-
-    /* ── iOS note ── */
-    .ios-note {
-      margin: 0 24px 32px;
-      padding: 12px 14px;
-      background: rgba(93, 232, 200, 0.06);
-      border: 1px solid rgba(93, 232, 200, 0.2);
+    .ctrl-btn {
+      padding: 9px 20px;
       border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      font-size: 0.7rem;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s;
+      letter-spacing: 0.04em;
     }
 
-    .ios-note p {
-      font-size: 0.6rem;
-      color: var(--soft);
+    .ctrl-btn:active {
+      transform: scale(0.95);
+    }
+
+    .ctrl-btn.on {
+      background: rgba(250, 204, 21, 0.2);
+      border-color: rgba(250, 204, 21, 0.6);
+      color: #facc15;
+    }
+
+    /* ── Thumbnail image ── */
+    #thumb-img {
+      position: fixed;
+      bottom: 130px;
+      right: 16px;
+      width: 72px;
+      height: 72px;
+      border-radius: 10px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      object-fit: cover;
+      display: none;
+      z-index: 150;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    #thumb-img:active {
+      transform: scale(0.93);
+    }
+
+    /* ── Info panel (зураг дарахад) ── */
+    #info-panel {
+      position: fixed;
+      bottom: 200px;
+      left: 16px;
+      right: 16px;
+      z-index: 160;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: none;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    #info-panel h3 {
+      color: #facc15;
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+      letter-spacing: 0.06em;
+    }
+
+    #info-panel p {
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 0.65rem;
       line-height: 1.6;
     }
 
-    .ios-note strong {
-      color: var(--teal);
-    }
-
-    /* ── Steps ── */
-    .steps {
-      margin: 0 24px 40px;
-    }
-
-    .steps h3 {
-      font-family: 'Clash Display', sans-serif;
-      font-size: 0.85rem;
-      margin-bottom: 14px;
-      color: var(--gold);
-    }
-
-    .step {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-      margin-bottom: 14px;
-    }
-
-    .step-num {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 1px solid var(--teal);
-      color: var(--teal);
-      font-size: 0.65rem;
+    /* ── Surface indicator (gyro-based тайлбар) ── */
+    #surface-bar {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 150;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 99px;
+      padding: 6px 16px;
       display: flex;
       align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
+      gap: 8px;
+      transition: opacity 0.4s;
     }
 
-    .step-text {
-      font-size: 0.65rem;
-      color: var(--soft);
-      line-height: 1.55;
-      padding-top: 3px;
+    #surface-bar .sb-icon {
+      font-size: 0.85rem;
     }
 
-    .step-text strong {
-      color: var(--text);
+    #surface-bar span {
+      font-size: 0.6rem;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 0.08em;
     }
 
-    /* ── Unsupported message ── */
-    #unsupported {
-      display: none;
-      margin: 0 24px;
-      padding: 14px;
-      background: rgba(255, 80, 80, 0.08);
-      border: 1px solid rgba(255, 80, 80, 0.25);
-      border-radius: 10px;
-      font-size: 0.65rem;
-      color: #ff8080;
-      line-height: 1.6;
+    #surface-confidence {
+      width: 60px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    #surface-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #facc15, #4ade80);
+      border-radius: 99px;
+      transition: width 0.3s;
     }
   </style>
 </head>
 
 <body>
 
-  <header>
-    <p class="eyebrow">Marker-гүй · iPhone Native AR</p>
-    <h1>Ширээн дээр<br /><em>3D объект</em></h1>
-    <p class="sub">Apple AR Quick Look ашиглан marker хэрэггүйгээр<br />яг ширээн дээр тогтвортой харагдана</p>
-  </header>
+  <!-- Scan overlay -->
+  <div id="scan-overlay">
+    <div class="corner-guide cg-tl"></div>
+    <div class="corner-guide cg-tr"></div>
+    <div class="corner-guide cg-bl"></div>
+    <div class="corner-guide cg-br"></div>
 
-  <div class="how">
-    <div class="how-icon">📱</div>
-    <div class="how-text">
-      <h3>Яаж ажилладаг вэ?</h3>
-      <p>
-        AR товч дарахад iOS-ийн <strong>ARKit</strong> идэвхжиж,
-        камераар ширээний гадаргуу илрүүлж, 3D объектыг
-        яг тэр дээр байрлуулна — бодит орчинтой нийлнэ.
-      </p>
-    </div>
-  </div>
-
-  <!-- Object selector -->
-  <p class="section-label">// объект сонгох</p>
-  <div class="grid">
-    <div class="obj-card selected" onclick="selectObj(this, 'chair')"
-      data-model="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
-      data-usdz="https://developer.apple.com/augmented-reality/quick-look/models/drummertoy/toy_drummer.usdz">
-      <div class="preview">🧑‍🚀</div>
-      <div class="info">
-        <div class="name">Astronaut</div>
-        <div class="desc">Animated · GLB</div>
+    <div id="reticle-wrap">
+      <div class="reticle-outer">
+        <div class="reticle-inner"></div>
       </div>
-      <span class="selected-badge">ACTIVE</span>
     </div>
 
-    <div class="obj-card" onclick="selectObj(this, 'robot')"
-      data-model="https://modelviewer.dev/shared-assets/models/RobotExpressive.glb"
-      data-usdz="https://developer.apple.com/augmented-reality/quick-look/models/teapot/teapot.usdz">
-      <div class="preview">🤖</div>
-      <div class="info">
-        <div class="name">Robot</div>
-        <div class="desc">Animated · GLB</div>
-      </div>
-      <span class="selected-badge">ACTIVE</span>
-    </div>
-
-    <div class="obj-card" onclick="selectObj(this, 'duck')"
-      data-model="https://modelviewer.dev/shared-assets/models/Duck.glb"
-      data-usdz="https://developer.apple.com/augmented-reality/quick-look/models/retrotv/tv_retro.usdz">
-      <div class="preview">🦆</div>
-      <div class="info">
-        <div class="name">Duck</div>
-        <div class="desc">Static · GLB</div>
-      </div>
-      <span class="selected-badge">ACTIVE</span>
-    </div>
-
-    <div class="obj-card" onclick="selectObj(this, 'helmet')"
-      data-model="https://modelviewer.dev/shared-assets/models/glTF-Sample-Assets/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb"
-      data-usdz="https://developer.apple.com/augmented-reality/quick-look/models/gramophone/gramophone.usdz">
-      <div class="preview">⛑️</div>
-      <div class="info">
-        <div class="name">Helmet</div>
-        <div class="desc">PBR · GLB</div>
-      </div>
-      <span class="selected-badge">ACTIVE</span>
+    <div id="scan-hint">
+      <div class="scan-label" id="scan-label-text">Гадаргуу хайж байна</div>
+      <p id="scan-desc">Камерыг ширээ эсвэл шал руу<br />аажуухан чиглүүлнэ үү</p>
     </div>
   </div>
 
-  <!-- 3D Preview -->
-  <div class="viewer-wrap">
-    <model-viewer id="viewer" src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
-      ios-src="https://developer.apple.com/augmented-reality/quick-look/models/drummertoy/toy_drummer.usdz"
-      alt="3D AR object" auto-rotate camera-controls ar ar-modes="quick-look scene-viewer webxr" ar-scale="fixed"
-      environment-image="neutral" shadow-intensity="1.2" shadow-softness="0.8" exposure="1.1"
-      loading="eager"></model-viewer>
-  </div>
-
-  <!-- AR Launch Button -->
-  <a class="ar-btn" id="ar-btn" href="#" onclick="launchAR(event)">
-    <span class="ar-icon">⬡</span>
-    AR-д нээх — ширээн дээр харах
-  </a>
-
-  <div id="unsupported">
-    ⚠️ Таны браузер AR дэмжихгүй байна. iPhone дээр Safari-г ашиглана уу.
-  </div>
-
-  <!-- iOS steps -->
-  <div class="steps">
-    <h3>// Алхамууд</h3>
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-text"><strong>Объект сонго</strong> — дээрх картуудаас хүссэнээ дарна уу</div>
-    </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-text"><strong>"AR-д нээх" товч дар</strong> — iOS AR Quick Look нээгдэнэ</div>
-    </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-text"><strong>Камераа ширээ рүү чиглүүл</strong> — гадаргуу илрүүлнэ (шар шугам гарна)</div>
-    </div>
-    <div class="step">
-      <div class="step-num">4</div>
-      <div class="step-text"><strong>Объект автоматаар байрлана</strong> — хөдөлгөх, томруулах, эргүүлэх боломжтой</div>
+  <!-- Surface confidence bar -->
+  <div id="surface-bar">
+    <span class="sb-icon">📐</span>
+    <span id="surface-text">Гадаргуу тодорхойлж байна…</span>
+    <div id="surface-confidence">
+      <div id="surface-fill"></div>
     </div>
   </div>
 
-  <div class="ios-note">
-    <p>
-      <strong>iOS AR Quick Look</strong> нь Apple-ийн native ARKit ашигладаг тул
-      marker хэрэггүй, ширээ/шал/хана дээр бодит мэт тогтвортой харагдана.<br /><br />
-      Өөрийн GLB/USDZ файл ашиглахдаа <code>src</code> болон <code>ios-src</code>-г
-      өөрчлөх хэрэгтэй. HTTPS сервер дээр байршуулсан байх ёстой.
-    </p>
+  <!-- Marker found toast -->
+  <div id="found-toast">
+    <div class="dot"></div>
+    <span>Marker олдлоо — тогтвортой горим</span>
   </div>
+
+  <!-- Thumbnail -->
+  <img id="thumb-img" src="" onclick="toggleInfo()" />
+
+  <!-- Info panel -->
+  <div id="info-panel">
+    <h3 id="info-title"></h3>
+    <p id="info-desc"></p>
+  </div>
+
+  <!-- Controls -->
+  <div id="controls">
+    <div id="model-tabs">
+      <button class="model-tab active" onclick="showModel(1)">1</button>
+      <button class="model-tab" onclick="showModel(2)">2</button>
+      <button class="model-tab" onclick="showModel(3)">3</button>
+      <button class="model-tab" onclick="showModel(4)">4</button>
+    </div>
+    <div id="rotate-row">
+      <button class="ctrl-btn" id="rotate-btn" onclick="toggleRotate()">⟳ Эргүүлэх</button>
+      <button class="ctrl-btn" id="reset-btn" onclick="resetModel()">↺ Шинэчлэх</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ A-FRAME SCENE ═══════════════════════════════ -->
+  <a-scene mindar-image="imageTargetSrc: targets6.mind; warmupTolerance: 1; missTolerance: 5;" color-space="sRGB"
+    renderer="colorManagement: true; physicallyCorrectLights: true;" vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false">
+    <a-assets>
+      <a-asset-item id="model1" src="assets/bee-gltf/dotood.glb"></a-asset-item>
+      <a-asset-item id="model2" src="assets/bee-gltf/4.glb"></a-asset-item>
+      <a-asset-item id="model3" src="assets/bee-gltf/5.glb"></a-asset-item>
+      <a-asset-item id="model4" src="assets/bee-gltf/6.glb"></a-asset-item>
+    </a-assets>
+
+    <!-- Гэрэлтэлт -->
+    <a-light type="ambient" color="#ffffff" intensity="0.6"></a-light>
+    <a-light type="directional" color="#fff4e0" intensity="1.2" position="1 3 2" cast-shadow="true"></a-light>
+    <a-light type="point" color="#c0d4ff" intensity="0.4" position="-1 2 -1"></a-light>
+
+    <a-camera position="0 0 0" look-controls="enabled: false">
+      <a-cursor fuse="false" raycaster="objects: .clickable"></a-cursor>
+    </a-camera>
+
+    <!-- ── PRE-MARKER: Gyro-based surface plane ── -->
+    <!--
+    Marker олдоогүй үед энэ entity нь DeviceOrientation-оор
+    "ширээн дээр байгаа мэт" байрлалд хадгалагдана.
+    JS дотор gyro утгаар position/rotation нь тохируулагдана.
+  -->
+    <a-entity id="surface-entity" position="0 -0.5 -1.5" visible="false">
+
+      <!-- Shadow plane -->
+      <a-plane id="pre-shadow" rotation="-90 0 0" width="1.5" height="1.5" color="#000" opacity="0.2"
+        material="transparent: true; depthWrite: false"></a-plane>
+
+      <!-- Pre-marker models (marker олдоогүй үед) -->
+      <a-gltf-model id="pre-gltf1" src="#model1" position="0 0 0" scale="0.005 0.005 0.005"
+        visible="false"></a-gltf-model>
+      <a-gltf-model id="pre-gltf2" src="#model2" position="0 0 0" scale="0.005 0.005 0.005"
+        visible="false"></a-gltf-model>
+      <a-gltf-model id="pre-gltf3" src="#model3" position="0 0 0" scale="0.005 0.005 0.005"
+        visible="false"></a-gltf-model>
+      <a-gltf-model id="pre-gltf4" src="#model4" position="0 0 0" scale="0.005 0.005 0.005"
+        visible="false"></a-gltf-model>
+
+    </a-entity>
+
+    <!-- ── MARKER-BASED: Image target ── -->
+    <a-entity mindar-image-target="targetIndex: 0" id="targetEntity">
+
+      <!-- Text container -->
+      <a-entity id="textContainer" position="0 0.3 0.3" visible="false">
+        <a-plane width="0.8" height="0.6" color="#222" opacity="0.75" position="1 0 0"></a-plane>
+        <a-text id="welcomeText" value="" align="center" color="#FFD700" width="2" position="1 0 0.01"></a-text>
+      </a-entity>
+
+      <!-- Marker-based models -->
+      <a-gltf-model class="clickable" id="gltf1" src="#model1" position="0 0 0.3" scale="0.005 0.005 0.005"
+        visible="false"></a-gltf-model>
+      <a-gltf-model class="clickable" id="gltf2" src="#model2" position="0 0 0.3" scale="0.005 0.005 0.005"
+        visible="false"></a-gltf-model>
+      <a-gltf-model class="clickable" id="gltf3" src="#model3" position="0 0 0.3" scale="0.005 0.005 0.005"
+        visible="false"></a-gltf-model>
+      <a-gltf-model class="clickable" id="gltf4" src="#model4" position="0 0 0.3" scale="0.005 0.005 0.005"
+        visible="false"></a-gltf-model>
+
+    </a-entity>
+
+  </a-scene>
 
   <script>
-    const viewer = document.getElementById('viewer');
-    const arBtn = document.getElementById('ar-btn');
-    const cards = document.querySelectorAll('.obj-card');
+    // ═══════════════════════════════════════════════════
+    //  Config
+    // ═══════════════════════════════════════════════════
+    const MODEL_DATA = [
+      { name: "Хүний бие", desc: "Хүний биеийн бүтэц, эрхтэн тогтолцоо", img: "assets/1.jpg" },
+      { name: "Яс, хэлбэр", desc: "Аrag ясны тогтолцоо, холбоос, үений бүтэц", img: "assets/2.jpg" },
+      { name: "Цусан хангамж", desc: "Судасны систем, зүрх, цусны эргэлт", img: "assets/4.jpg" },
+      { name: "Булчин", desc: "Булчингийн бүлгүүд, хөдөлгөөний механизм", img: "assets/3.jpg" },
+    ];
 
-    let currentModel = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
-    let currentUSDZ = 'https://developer.apple.com/augmented-reality/quick-look/models/drummertoy/toy_drummer.usdz';
+    // ═══════════════════════════════════════════════════
+    //  State
+    // ═══════════════════════════════════════════════════
+    let markerFound = false;
+    let currentIndex = 1;      // 1-based
+    let rotating = false;
+    let infoVisible = false;
+    let surfaceReady = false;
+    let gyroPermitted = false;
+    let confidence = 0;
 
-    function selectObj(card, name) {
-      cards.forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
+    // ═══════════════════════════════════════════════════
+    //  DOM refs
+    // ═══════════════════════════════════════════════════
+    const targetEl = document.querySelector('#targetEntity');
+    const surfaceEl = document.querySelector('#surface-entity');
+    const scanOverlay = document.querySelector('#scan-overlay');
+    const foundToast = document.querySelector('#found-toast');
+    const surfaceBar = document.querySelector('#surface-bar');
+    const surfaceFill = document.querySelector('#surface-fill');
+    const surfaceText = document.querySelector('#surface-text');
+    const thumbImg = document.querySelector('#thumb-img');
+    const infoPanel = document.querySelector('#info-panel');
+    const infoTitle = document.querySelector('#info-title');
+    const infoDesc = document.querySelector('#info-desc');
+    const scanLabelText = document.querySelector('#scan-label-text');
+    const scanDesc = document.querySelector('#scan-desc');
+    const rotateBtn = document.querySelector('#rotate-btn');
 
-      currentModel = card.dataset.model;
-      currentUSDZ = card.dataset.usdz;
+    // Model element refs
+    const markerModels = [1, 2, 3, 4].map(i => document.querySelector(`#gltf${i}`));
+    const surfaceModels = [1, 2, 3, 4].map(i => document.querySelector(`#pre-gltf${i}`));
 
-      viewer.setAttribute('src', currentModel);
-      viewer.setAttribute('ios-src', currentUSDZ);
-    }
-
-    function launchAR(e) {
-      e.preventDefault();
-
-      // iOS: model-viewer ar button дуудах
-      const arButton = viewer.querySelector('[slot="ar-button"]');
-
-      // model-viewer internal AR activate
-      if (viewer.canActivateAR) {
-        viewer.activateAR();
+    // ═══════════════════════════════════════════════════
+    //  iOS DeviceOrientation permission + Gyro surface sim
+    // ═══════════════════════════════════════════════════
+    function requestGyro() {
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+          .then(state => {
+            if (state === 'granted') {
+              gyroPermitted = true;
+              window.addEventListener('deviceorientation', onGyro);
+            }
+          }).catch(console.warn);
       } else {
-        // iOS Safari fallback: USDZ шууд нээх = AR Quick Look
-        const a = document.createElement('a');
-        a.href = currentUSDZ;
-        a.rel = 'ar';
-        const img = document.createElement('img');
-        img.src = '';
-        a.appendChild(img);
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => document.body.removeChild(a), 500);
+        // Android / non-iOS — permission шаарддаггүй
+        gyroPermitted = true;
+        window.addEventListener('deviceorientation', onGyro);
       }
     }
 
-    // Check AR support
-    window.addEventListener('load', () => {
-      // model-viewer will handle iOS AR Quick Look natively
-      // For non-iOS show unsupported hint
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isAndroid = /Android/.test(navigator.userAgent);
+    let gyroHistory = [];
 
-      if (!isIOS && !isAndroid) {
-        document.getElementById('unsupported').style.display = 'block';
-        arBtn.style.opacity = '0.4';
-        arBtn.style.pointerEvents = 'none';
+    function onGyro(e) {
+      if (markerFound) return;
+
+      const beta = e.beta || 0;   // урд/хойш налалт (-180..180)
+      const gamma = e.gamma || 0;   // зүүн/баруун налалт (-90..90)
+
+      // Confidence: камер доош чиглэж байна уу? (beta 60-120° = доош)
+      const ideal = Math.abs(beta - 90);
+      const conf = Math.max(0, Math.min(100, 100 - ideal * 1.5));
+
+      gyroHistory.push(conf);
+      if (gyroHistory.length > 20) gyroHistory.shift();
+      confidence = gyroHistory.reduce((a, b) => a + b, 0) / gyroHistory.length;
+
+      surfaceFill.style.width = confidence.toFixed(0) + '%';
+
+      if (confidence > 55) {
+        surfaceText.textContent = 'Гадаргуу илрүүллээ ✓';
+        surfaceFill.style.background = 'linear-gradient(90deg,#4ade80,#22d3ee)';
+
+        if (!surfaceReady) {
+          surfaceReady = true;
+          scanLabelText.textContent = 'Гадаргуу бэлэн';
+          scanDesc.textContent = 'Marker зургийг камерт харуулна уу';
+
+          // surface entity харуулах + сонгосон model-г байрлуулах
+          surfaceEl.setAttribute('visible', 'true');
+          showSurfaceModel(currentIndex);
+        }
+
+        // Gyro-оор surface entity-г тохируулах
+        const tiltX = (gamma / 90) * 0.3;
+        const depth = -1.2 - (beta / 180) * 0.5;
+        surfaceEl.setAttribute('position', `${tiltX} -0.45 ${depth}`);
+        surfaceEl.setAttribute('rotation', `${(beta - 90) * 0.3} 0 ${-gamma * 0.2}`);
+
+      } else {
+        surfaceText.textContent = 'Камерыг доош чиглүүлнэ үү';
+        surfaceFill.style.background = 'linear-gradient(90deg,#facc15,#f97316)';
+      }
+    }
+
+    // Gyro эхлүүлэх — хуудас ачаалагдахад
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(requestGyro, 800);
+    });
+
+    // ═══════════════════════════════════════════════════
+    //  Marker events
+    // ═══════════════════════════════════════════════════
+    targetEl.addEventListener('targetFound', () => {
+      markerFound = true;
+
+      // Surface entity нуух
+      surfaceEl.setAttribute('visible', 'false');
+      surfaceModels.forEach(m => m.setAttribute('visible', 'false'));
+
+      // Scan overlay нуух
+      scanOverlay.style.opacity = '0';
+      surfaceBar.style.opacity = '0';
+
+      // Toast харуулах
+      foundToast.classList.add('show');
+      setTimeout(() => foundToast.classList.remove('show'), 2500);
+
+      // Marker model харуулах
+      showMarkerModel(currentIndex);
+    });
+
+    targetEl.addEventListener('targetLost', () => {
+      markerFound = false;
+
+      // Scan overlay эргүүлэх
+      scanOverlay.style.opacity = '1';
+      surfaceBar.style.opacity = '1';
+
+      // Marker models нуух
+      markerModels.forEach(m => {
+        m.setAttribute('visible', 'false');
+        m.removeAttribute('animation');
+      });
+
+      rotating = false;
+      rotateBtn.classList.remove('on');
+
+      // Surface entity дахин харуулах
+      if (surfaceReady) {
+        surfaceEl.setAttribute('visible', 'true');
+        showSurfaceModel(currentIndex);
       }
     });
+
+    // ═══════════════════════════════════════════════════
+    //  Model management
+    // ═══════════════════════════════════════════════════
+    function showMarkerModel(idx) {
+      markerModels.forEach((m, i) => m.setAttribute('visible', i === idx - 1 ? 'true' : 'false'));
+      if (rotating) applyRotation(markerModels[idx - 1]);
+    }
+
+    function showSurfaceModel(idx) {
+      surfaceModels.forEach((m, i) => m.setAttribute('visible', i === idx - 1 ? 'true' : 'false'));
+      if (rotating) applyRotation(surfaceModels[idx - 1]);
+    }
+
+    function showModel(idx) {
+      currentIndex = idx;
+
+      // Tab highlight
+      document.querySelectorAll('.model-tab').forEach((t, i) => {
+        t.classList.toggle('active', i === idx - 1);
+      });
+
+      // Thumbnail
+      thumbImg.src = MODEL_DATA[idx - 1].img;
+      thumbImg.style.display = 'block';
+
+      // Info hide
+      infoPanel.style.display = 'none';
+      infoVisible = false;
+
+      if (markerFound) {
+        showMarkerModel(idx);
+      } else {
+        if (surfaceReady) showSurfaceModel(idx);
+      }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  Rotate
+    // ═══════════════════════════════════════════════════
+    function applyRotation(el) {
+      el.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear');
+    }
+
+    function removeRotation(el) {
+      el.removeAttribute('animation');
+    }
+
+    function toggleRotate() {
+      rotating = !rotating;
+      rotateBtn.classList.toggle('on', rotating);
+
+      const active = markerFound ? markerModels[currentIndex - 1] : surfaceModels[currentIndex - 1];
+      if (!active) return;
+      rotating ? applyRotation(active) : removeRotation(active);
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  Reset
+    // ═══════════════════════════════════════════════════
+    function resetModel() {
+      rotating = false;
+      rotateBtn.classList.remove('on');
+
+      [...markerModels, ...surfaceModels].forEach(m => {
+        m.removeAttribute('animation');
+        m.setAttribute('rotation', '0 0 0');
+      });
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  Info panel
+    // ═══════════════════════════════════════════════════
+    function toggleInfo() {
+      const data = MODEL_DATA[currentIndex - 1];
+      if (infoVisible) {
+        infoPanel.style.display = 'none';
+        infoVisible = false;
+      } else {
+        infoTitle.textContent = data.name;
+        infoDesc.textContent = data.desc;
+        infoPanel.style.display = 'block';
+        infoVisible = true;
+      }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  Init — default model 1 сонгох
+    // ═══════════════════════════════════════════════════
+    window.addEventListener('load', () => {
+      showModel(1);
+    });
   </script>
+
 </body>
 
 </html>
