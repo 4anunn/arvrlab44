@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WebAR - Ширээн дээр 3D</title>
+    <style>
+        body { margin: 0; font-family: Arial; }
+        #info { position: absolute; top: 10px; left: 10px; color: white; z-index: 100; }
+        button { background: #4CAF50; color: white; border: none; padding: 12px; font-size: 16px; cursor: pointer; }
+    </style>
+    <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.158.0/examples/js/webxr/XRControllerModelFactory.js"></script>
+</head>
+<body>
+    <div id="info">
+        <button id="startAR">AR Эхлүүлэх</button>
+        <div id="status">Camera зөвшөөрнө үү...</div>
+        <button id="modelBtn" style="display:none;">Model солих</button>
+    </div>
+
+    <script>
+        let scene, camera, renderer, reticle, model, session;
+        let hitTestSource = null;
+        let modelIndex = 0;
+        const models = ['box', 'sphere', 'torus'];
+
+        async function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.xr.enabled = true;
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(1, 1, 0);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+
+            // Reticle (гадаргуу цэг)
+            const reticleGeometry = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2);
+            const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, opacity: 0.8, transparent: true });
+            reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+            reticle.visible = false;
+            scene.add(reticle);
+
+            // Status
+            document.getElementById('status').textContent = 'WebXR шалгаж байна...';
+
+            if (!navigator.xr) {
+                document.getElementById('status').textContent = '❌ WebXR дэмжигдээгүй!';
+                return;
+            }
+
+            const supported = await navigator.xr.isSessionSupported('immersive-ar');
+            if (!supported) {
+                document.getElementById('status').textContent = '❌ Энэ төхөөрөмж AR дэмжээгүй!';
+                return;
+            }
+
+            document.getElementById('startAR').style.display = 'block';
+            document.getElementById('status').textContent = '✅ Дэмжигдэж байна! AR эхлүүлнэ үү';
+        }
+
+        async function startAR() {
+            try {
+                session = await navigator.xr.requestSession('immersive-ar', {
+                    requiredFeatures: ['hit-test'],
+                    optionalFeatures: ['dom-overlay'],
+                    domOverlay: {root: document.body}
+                });
+
+                renderer.xr.setSession(session);
+
+                session.addEventListener('end', () => {
+                    document.getElementById('status').textContent = 'AR дууслаа';
+                });
+
+                session.updateRenderState({ depthNear: 0.1, depthFar: 100 });
+
+                // Hit test source
+                const referenceSpace = await session.requestReferenceSpace('viewer');
+                const viewerSpace = session.requestReferenceSpace('viewer');
+                const hitTestSourceSpace = await session.requestHitTestSource({ space: referenceSpace });
+
+                const frameObserver = await session.requestAnimationFrame(frame);
+
+                session.requestAnimationFrame(async (time, frame) => {
+                    frameObserver(time, frame);
+                    const referenceTracker = frame.getTracker(viewerSpace);
+                    const hitTestResults = frame.getHitTestResults(hitTestSourceSpace);
+
+                    if (hitTestResults.length > 0) {
+                        const hit = hitTestResults[0];
+                        const hitPose = hit.getPose(referenceTracker);
+                        reticle.visible = true;
+                        reticle.matrix.fromArray(hitPose.transform.matrix);
+                    } else {
+                        reticle.visible = false;
+                    }
+
+                    renderer.render(scene, camera);
+                    session.requestAnimationFrame(arguments.callee);
+                });
+
+                document.getElementById('startAR').style.display = 'none';
+                document.getElementById('modelBtn').style.display = 'block';
+                document.getElementById('status').textContent = '📱 Camera нээгдлээ! Ширээн дээр цэнхэр тойрог харагдана → Байрлуул';
+
+            } catch (error) {
+                console.error('AR error:', error);
+                document.getElementById('status').textContent = `❌ Алдаа: ${error.message}`;
+            }
+        }
+
+        // Model байрлуулах
+        function placeModel(hitPose) {
+            if (model) scene.remove(model);
+
+            const geometry = {
+                box: new THREE.BoxGeometry(0.2, 0.2, 0.2),
+                sphere: new THREE.SphereGeometry(0.15, 32, 32),
+                torus: new THREE.TorusGeometry(0.15, 0.05, 16, 100)
+            }[models[modelIndex]];
+
+            const material = new THREE.MeshPhongMaterial({ color: Math.random() * 0xffffff });
+            model = new THREE.Mesh(geometry, material);
+            model.position.setFromMatrixPosition(new THREE.Matrix4().fromArray(hitPose.transform.matrix));
+            model.castShadow = true;
+            model.receiveShadow = true;
+
+            scene.add(model);
+
+            // Animation
+            const animate = () => {
+                if (model) {
+                    model.rotation.y += 0.01;
+                    model.position.y += Math.sin(Date.now() * 0.001) * 0.001;
+                }
+                requestAnimationFrame(animate);
+            };
+            animate();
+        }
+
+        // Events
+        document.getElementById('startAR').addEventListener('click', startAR);
+        document.getElementById('modelBtn').addEventListener('click', () => {
+            modelIndex = (modelIndex + 1) % models.length;
+            document.getElementById('modelBtn').textContent = `Model: ${models[modelIndex]}`;
+        });
+
+        renderer.xr.addEventListener('beforeSessionStart', () => {
+            renderer.xr.camera.position.set(0, 0, 0);
+        });
+
+        // Tap to place (touch)
+        renderer.domElement.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (reticle.visible && session && session.inputSources) {
+                // Hit test result ашиглах эсвэл reference space
+                session.requestHitTestSource({ space: session.requestReferenceSpace('viewer') })
+                    .then(hitTestSource => {
+                        // Simplified place
+                        const pose = { transform: { matrix: reticle.matrix.elements } };
+                        placeModel(pose);
+                    });
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        init();
+    </script>
+</body>
+</html>

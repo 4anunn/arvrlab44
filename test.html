@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+</head>
+
+<body>
+
+  <a-scene webxr="requiredFeatures: hit-test, anchors; optionalFeatures: dom-overlay"
+    renderer="colorManagement: true; physicallyCorrectLights: true" vr-mode-ui="enabled: false" embedded>
+
+    <a-assets>
+      <a-asset-item id="model" src="assets/bee-gltf/dotood.glb"></a-asset-item>
+    </a-assets>
+
+    <!-- Camera -->
+    <a-camera position="0 1.6 0"></a-camera>
+
+    <!-- Reticle -->
+    <a-entity id="reticle" geometry="primitive: ring; radiusInner: 0.08; radiusOuter: 0.1"
+      material="color: #FFD700; shader: flat" rotation="-90 0 0" visible="false">
+    </a-entity>
+
+    <!-- Model -->
+    <a-gltf-model id="placedModel" src="#model" scale="0.2 0.2 0.2" visible="false">
+    </a-gltf-model>
+
+  </a-scene>
+
+  <script>
+    const scene = document.querySelector('a-scene');
+    const reticle = document.querySelector('#reticle');
+    const model = document.querySelector('#placedModel');
+
+    let hitTestSource = null;
+    let viewerSpace = null;
+    let localSpace = null;
+    let anchor = null;
+
+    scene.renderer.xr.addEventListener('sessionstart', async () => {
+
+      const session = scene.renderer.xr.getSession();
+
+      viewerSpace = await session.requestReferenceSpace('viewer');
+      localSpace = await session.requestReferenceSpace('local');
+
+      hitTestSource = await session.requestHitTestSource({
+        space: viewerSpace
+      });
+
+      scene.renderer.xr.setAnimationLoop((timestamp, frame) => {
+
+        if (!frame) return;
+
+        const hitTestResults = frame.getHitTestResults(hitTestSource);
+
+        if (hitTestResults.length > 0) {
+
+          const hit = hitTestResults[0];
+          const pose = hit.getPose(localSpace);
+
+          reticle.visible = true;
+          reticle.object3D.position.set(
+            pose.transform.position.x,
+            pose.transform.position.y,
+            pose.transform.position.z
+          );
+
+          reticle.object3D.quaternion.set(
+            pose.transform.orientation.x,
+            pose.transform.orientation.y,
+            pose.transform.orientation.z,
+            pose.transform.orientation.w
+          );
+
+          scene.canvas.addEventListener('click', async () => {
+            if (anchor) return;
+
+            anchor = await hit.createAnchor();
+            model.visible = true;
+          });
+
+        } else {
+          reticle.visible = false;
+        }
+      });
+    });
+  </script>
+
+</body>
+
+</html>
