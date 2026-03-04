@@ -1,818 +1,515 @@
 <!DOCTYPE html>
 <html lang="mn">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WebAR – Surface Placement</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>WebAR — iPhone AR</title>
+
+  <!-- Google Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Clash+Display:wght@500;700&display=swap"
+    rel="stylesheet" />
+
+  <!-- model-viewer (Google) — iOS AR Quick Look + Android Scene Viewer -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #0d0d12;
+      --surface: #16161f;
+      --card: #1c1c28;
+      --line: #2a2a3a;
+      --gold: #e8c97a;
+      --teal: #5de8c8;
+      --soft: #a0a0c0;
+      --text: #eeeef8;
+    }
 
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
     body {
-      background: #0a0a0f;
-      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+      height: 100%;
+      background: var(--ink);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 52px 24px 20px;
+      position: relative;
       overflow: hidden;
-      color: #fff;
     }
 
-    #splash {
-      position: fixed; inset: 0;
-      background: linear-gradient(145deg, #0d0d1a 0%, #111827 50%, #0a0f1e 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      gap: 0;
+    header::before {
+      content: '';
+      position: absolute;
+      top: -60px;
+      left: -60px;
+      width: 280px;
+      height: 280px;
+      background: radial-gradient(circle, rgba(93, 232, 200, 0.08) 0%, transparent 70%);
+      pointer-events: none;
     }
 
-    .splash-logo {
-      width: 90px; height: 90px;
-      background: linear-gradient(135deg, #00d4ff, #0080ff, #7c3aed);
-      border-radius: 28px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 42px;
-      margin-bottom: 32px;
-      box-shadow: 0 20px 60px rgba(0,180,255,0.35), 0 0 0 1px rgba(255,255,255,0.08);
-      animation: logoPulse 2.5s ease-in-out infinite;
+    .eyebrow {
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      color: var(--teal);
+      text-transform: uppercase;
+      margin-bottom: 8px;
     }
 
-    @keyframes logoPulse {
-      0%, 100% { box-shadow: 0 20px 60px rgba(0,180,255,0.35), 0 0 0 1px rgba(255,255,255,0.08); }
-      50% { box-shadow: 0 20px 80px rgba(0,180,255,0.6), 0 0 0 1px rgba(255,255,255,0.15); }
-    }
-
-    .splash-title {
-      font-size: 30px;
+    h1 {
+      font-family: 'Clash Display', sans-serif;
+      font-size: 1.9rem;
       font-weight: 700;
-      letter-spacing: -0.5px;
-      background: linear-gradient(135deg, #ffffff, #a0c4ff);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 10px;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
     }
 
-    .splash-subtitle {
-      font-size: 15px;
-      color: rgba(255,255,255,0.45);
-      letter-spacing: 0.2px;
-      margin-bottom: 48px;
-      text-align: center;
-      max-width: 260px;
-      line-height: 1.5;
+    h1 em {
+      font-style: normal;
+      color: var(--gold);
     }
 
-    #startBtn {
-      background: linear-gradient(135deg, #0080ff, #00d4ff);
-      border: none;
-      color: #fff;
-      font-size: 17px;
-      font-weight: 600;
-      padding: 18px 48px;
-      border-radius: 50px;
-      cursor: pointer;
-      letter-spacing: 0.3px;
-      box-shadow: 0 8px 32px rgba(0,128,255,0.45);
-      transition: transform 0.15s, box-shadow 0.15s;
-    }
-
-    #startBtn:active { transform: scale(0.96); box-shadow: 0 4px 16px rgba(0,128,255,0.3); }
-
-    #not-supported {
-      display: none;
-      background: rgba(255,60,60,0.12);
-      border: 1px solid rgba(255,60,60,0.3);
-      border-radius: 16px;
-      padding: 20px 28px;
-      margin-top: 16px;
-      font-size: 14px;
-      color: #ff6b6b;
-      text-align: center;
-      max-width: 300px;
+    .sub {
+      margin-top: 8px;
+      font-size: 0.65rem;
+      color: var(--soft);
       line-height: 1.6;
     }
 
-    /* ── HUD overlay ── */
-    #hud {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 10;
-      display: none;
-    }
-
-    /* Top status bar */
-    #status-bar {
-      position: absolute;
-      top: env(safe-area-inset-top, 20px);
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.55);
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 50px;
-      padding: 10px 22px;
-      font-size: 14px;
-      font-weight: 500;
-      color: rgba(255,255,255,0.9);
-      letter-spacing: 0.2px;
-      white-space: nowrap;
-      transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
-    }
-
-    #status-bar .dot {
-      display: inline-block;
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: #ffcc00;
-      margin-right: 8px;
-      vertical-align: middle;
-      animation: blink 1.2s ease-in-out infinite;
-    }
-
-    #status-bar.ready .dot { background: #34d058; animation: none; }
-    #status-bar.placed .dot { background: #0080ff; animation: none; }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
-    }
-
-    /* Bottom controls */
-    #bottom-controls {
-      position: absolute;
-      bottom: calc(env(safe-area-inset-bottom, 24px) + 20px);
-      left: 0; right: 0;
+    /* ── How it works banner ── */
+    .how {
+      margin: 0 24px 24px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--teal);
+      border-radius: 10px;
+      padding: 14px 16px;
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 14px;
-      pointer-events: all;
+      gap: 12px;
+      align-items: flex-start;
     }
 
-    .hint-label {
-      font-size: 13px;
-      color: rgba(255,255,255,0.5);
-      letter-spacing: 0.3px;
+    .how-icon {
+      font-size: 1.4rem;
+      flex-shrink: 0;
+      margin-top: 1px;
     }
 
-    #placeBtn {
-      width: 72px; height: 72px;
-      background: rgba(255,255,255,0.95);
-      border: none;
-      border-radius: 50%;
+    .how-text h3 {
+      font-family: 'Clash Display', sans-serif;
+      font-size: 0.8rem;
+      color: var(--teal);
+      margin-bottom: 4px;
+    }
+
+    .how-text p {
+      font-size: 0.62rem;
+      color: var(--soft);
+      line-height: 1.55;
+    }
+
+    /* ── Object grid ── */
+    .section-label {
+      padding: 0 24px 12px;
+      font-size: 0.58rem;
+      letter-spacing: 0.18em;
+      color: var(--soft);
+      text-transform: uppercase;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 0 24px 24px;
+    }
+
+    .obj-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
       cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 0 6px rgba(255,255,255,0.15);
-      transition: transform 0.15s, box-shadow 0.15s;
+      transition: border-color 0.2s, transform 0.15s;
       position: relative;
     }
 
-    #placeBtn::before {
-      content: '';
-      width: 58px; height: 58px;
-      border-radius: 50%;
-      border: 2px solid rgba(0,0,0,0.15);
-      position: absolute;
+    .obj-card:active {
+      transform: scale(0.97);
     }
 
-    #placeBtn:active { transform: scale(0.92); }
-    #placeBtn.placed { background: linear-gradient(135deg, #0080ff, #00d4ff); }
+    .obj-card.selected {
+      border-color: var(--gold);
+    }
 
-    #placeBtn svg { width: 28px; height: 28px; }
-
-    /* Model selector */
-    #model-selector {
+    .obj-card .preview {
+      height: 130px;
       display: flex;
-      gap: 10px;
-      pointer-events: all;
+      align-items: center;
+      justify-content: center;
+      font-size: 3.2rem;
+      background: var(--surface);
+      position: relative;
     }
 
-    .model-btn {
-      background: rgba(0,0,0,0.5);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 12px;
-      padding: 8px 16px;
-      font-size: 12px;
-      color: rgba(255,255,255,0.75);
-      cursor: pointer;
-      transition: all 0.2s;
-      font-weight: 500;
-    }
-
-    .model-btn.active {
-      background: rgba(0,128,255,0.35);
-      border-color: rgba(0,180,255,0.5);
-      color: #fff;
-    }
-
-    /* Exit button */
-    #exitBtn {
+    .obj-card .preview::after {
+      content: '';
       position: absolute;
-      top: calc(env(safe-area-inset-top, 20px) + 54px);
-      right: 20px;
-      width: 40px; height: 40px;
-      background: rgba(0,0,0,0.5);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-      pointer-events: all;
-      font-size: 18px;
-      color: rgba(255,255,255,0.8);
-      transition: background 0.2s;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(232, 201, 122, 0.06) 0%, transparent 70%);
     }
 
-    #exitBtn:hover { background: rgba(255,60,60,0.35); }
-
-    canvas { display: block; }
-
-    /* Scan animation overlay */
-    #scan-lines {
-      position: fixed;
-      inset: 0;
-      background:
-        repeating-linear-gradient(
-          0deg,
-          transparent,
-          transparent 3px,
-          rgba(0,200,255,0.015) 3px,
-          rgba(0,200,255,0.015) 4px
-        );
-      pointer-events: none;
-      z-index: 5;
-      opacity: 0;
-      transition: opacity 0.5s;
+    .obj-card .info {
+      padding: 10px 12px 12px;
     }
 
-    #scan-lines.visible { opacity: 1; }
+    .obj-card .name {
+      font-family: 'Clash Display', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
 
-    /* Corner brackets */
-    #corners {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 6;
+    .obj-card .desc {
+      font-size: 0.58rem;
+      color: var(--soft);
+    }
+
+    .selected-badge {
       display: none;
-    }
-
-    .corner {
       position: absolute;
-      width: 32px; height: 32px;
-      border-color: rgba(0,200,255,0.6);
-      border-style: solid;
+      top: 8px;
+      right: 8px;
+      background: var(--gold);
+      color: #000;
+      font-size: 0.55rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 99px;
+      letter-spacing: 0.08em;
     }
 
-    .corner.tl { top: 20px; left: 20px; border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
-    .corner.tr { top: 20px; right: 20px; border-width: 2px 2px 0 0; border-radius: 0 4px 0 0; }
-    .corner.bl { bottom: 20px; left: 20px; border-width: 0 0 2px 2px; border-radius: 0 0 0 4px; }
-    .corner.br { bottom: 20px; right: 20px; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+    .obj-card.selected .selected-badge {
+      display: block;
+    }
+
+    /* ── model-viewer container ── */
+    .viewer-wrap {
+      margin: 0 24px 20px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      position: relative;
+    }
+
+    model-viewer {
+      width: 100%;
+      height: 300px;
+      background: transparent;
+      --poster-color: transparent;
+    }
+
+    /* AR button override */
+    model-viewer::part(ar-button) {
+      display: none;
+      /* custom button-г ашиглана */
+    }
+
+    /* ── AR launch button ── */
+    .ar-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin: 0 24px 16px;
+      padding: 17px;
+      background: linear-gradient(135deg, var(--gold) 0%, #d4a843 100%);
+      color: #0d0d12;
+      font-family: 'Clash Display', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: opacity 0.2s, transform 0.15s;
+      text-decoration: none;
+      width: calc(100% - 48px);
+    }
+
+    .ar-btn:active {
+      transform: scale(0.98);
+      opacity: 0.9;
+    }
+
+    .ar-btn .ar-icon {
+      font-size: 1.3rem;
+    }
+
+    /* ── iOS note ── */
+    .ios-note {
+      margin: 0 24px 32px;
+      padding: 12px 14px;
+      background: rgba(93, 232, 200, 0.06);
+      border: 1px solid rgba(93, 232, 200, 0.2);
+      border-radius: 10px;
+    }
+
+    .ios-note p {
+      font-size: 0.6rem;
+      color: var(--soft);
+      line-height: 1.6;
+    }
+
+    .ios-note strong {
+      color: var(--teal);
+    }
+
+    /* ── Steps ── */
+    .steps {
+      margin: 0 24px 40px;
+    }
+
+    .steps h3 {
+      font-family: 'Clash Display', sans-serif;
+      font-size: 0.85rem;
+      margin-bottom: 14px;
+      color: var(--gold);
+    }
+
+    .step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+
+    .step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid var(--teal);
+      color: var(--teal);
+      font-size: 0.65rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .step-text {
+      font-size: 0.65rem;
+      color: var(--soft);
+      line-height: 1.55;
+      padding-top: 3px;
+    }
+
+    .step-text strong {
+      color: var(--text);
+    }
+
+    /* ── Unsupported message ── */
+    #unsupported {
+      display: none;
+      margin: 0 24px;
+      padding: 14px;
+      background: rgba(255, 80, 80, 0.08);
+      border: 1px solid rgba(255, 80, 80, 0.25);
+      border-radius: 10px;
+      font-size: 0.65rem;
+      color: #ff8080;
+      line-height: 1.6;
+    }
   </style>
 </head>
+
 <body>
 
-<!-- ── Splash Screen ── -->
-<div id="splash">
-  <div class="splash-logo">🔮</div>
-  <div class="splash-title">WebAR Studio</div>
-  <div class="splash-subtitle">Гадаргуу илрүүлж, 3D объект байрлуулна</div>
-  <button id="startBtn" onclick="startAR()">AR эхлүүлэх</button>
-  <div id="not-supported"></div>
-</div>
+  <header>
+    <p class="eyebrow">Marker-гүй · iPhone Native AR</p>
+    <h1>Ширээн дээр<br /><em>3D объект</em></h1>
+    <p class="sub">Apple AR Quick Look ашиглан marker хэрэггүйгээр<br />яг ширээн дээр тогтвортой харагдана</p>
+  </header>
 
-<!-- ── Scan Lines ── -->
-<div id="scan-lines"></div>
-
-<!-- ── Corner brackets ── -->
-<div id="corners">
-  <div class="corner tl"></div>
-  <div class="corner tr"></div>
-  <div class="corner bl"></div>
-  <div class="corner br"></div>
-</div>
-
-<!-- ── AR HUD ── -->
-<div id="hud">
-  <div id="status-bar">
-    <span class="dot"></span>
-    <span id="status-text">Гадаргуу хайж байна…</span>
-  </div>
-
-  <div id="exitBtn" onclick="exitAR()">✕</div>
-
-  <div id="bottom-controls">
-    <div id="model-selector">
-      <button class="model-btn active" onclick="selectModel('box')">📦 Хайрцаг</button>
-      <button class="model-btn" onclick="selectModel('sphere')">🔮 Бөмбөрцөг</button>
-      <button class="model-btn" onclick="selectModel('torus')">🍩 Тор</button>
+  <div class="how">
+    <div class="how-icon">📱</div>
+    <div class="how-text">
+      <h3>Яаж ажилладаг вэ?</h3>
+      <p>
+        AR товч дарахад iOS-ийн <strong>ARKit</strong> идэвхжиж,
+        камераар ширээний гадаргуу илрүүлж, 3D объектыг
+        яг тэр дээр байрлуулна — бодит орчинтой нийлнэ.
+      </p>
     </div>
-    <div class="hint-label" id="hint-text">Ширээн дээр камераа чиглүүл</div>
-    <button id="placeBtn" onclick="placeObject()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round">
-        <circle cx="12" cy="12" r="4"/>
-        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
-      </svg>
-    </button>
   </div>
-</div>
 
-<!-- three.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <!-- Object selector -->
+  <p class="section-label">// объект сонгох</p>
+  <div class="grid">
+    <div class="obj-card selected" onclick="selectObj(this, 'chair')"
+      data-model="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
+      data-usdz="https://developer.apple.com/augmented-reality/quick-look/models/drummertoy/toy_drummer.usdz">
+      <div class="preview">🧑‍🚀</div>
+      <div class="info">
+        <div class="name">Astronaut</div>
+        <div class="desc">Animated · GLB</div>
+      </div>
+      <span class="selected-badge">ACTIVE</span>
+    </div>
 
-<script>
-// ════════════════════════════════════════════
-//  CONFIG & STATE
-// ════════════════════════════════════════════
-const CONFIG = {
-  reticleColor: 0x00ccff,
-  shadowOpacity: 0.35,
-  objectScale: 0.12,
-  floatAmplitude: 0.008,
-  floatSpeed: 1.4,
-  rotateSpeed: 0.6,
-};
+    <div class="obj-card" onclick="selectObj(this, 'robot')"
+      data-model="https://modelviewer.dev/shared-assets/models/RobotExpressive.glb"
+      data-usdz="https://developer.apple.com/augmented-reality/quick-look/models/teapot/teapot.usdz">
+      <div class="preview">🤖</div>
+      <div class="info">
+        <div class="name">Robot</div>
+        <div class="desc">Animated · GLB</div>
+      </div>
+      <span class="selected-badge">ACTIVE</span>
+    </div>
 
-let renderer, scene, camera;
-let reticle, hitTestSource, xrSession;
-let placedObjects = [];
-let currentModelType = 'box';
-let surfaceDetected = false;
-let objectPlaced = false;
-let referenceSpace;
-let clock;
-let shadowMesh;
-let directionalLight, ambientLight, fillLight;
-let frameCount = 0;
+    <div class="obj-card" onclick="selectObj(this, 'duck')"
+      data-model="https://modelviewer.dev/shared-assets/models/Duck.glb"
+      data-usdz="https://developer.apple.com/augmented-reality/quick-look/models/retrotv/tv_retro.usdz">
+      <div class="preview">🦆</div>
+      <div class="info">
+        <div class="name">Duck</div>
+        <div class="desc">Static · GLB</div>
+      </div>
+      <span class="selected-badge">ACTIVE</span>
+    </div>
 
-// ════════════════════════════════════════════
-//  AR SUPPORT CHECK
-// ════════════════════════════════════════════
-async function checkARSupport() {
-  if (!navigator.xr) return false;
-  return await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
-}
+    <div class="obj-card" onclick="selectObj(this, 'helmet')"
+      data-model="https://modelviewer.dev/shared-assets/models/glTF-Sample-Assets/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb"
+      data-usdz="https://developer.apple.com/augmented-reality/quick-look/models/gramophone/gramophone.usdz">
+      <div class="preview">⛑️</div>
+      <div class="info">
+        <div class="name">Helmet</div>
+        <div class="desc">PBR · GLB</div>
+      </div>
+      <span class="selected-badge">ACTIVE</span>
+    </div>
+  </div>
 
-async function startAR() {
-  const supported = await checkARSupport();
+  <!-- 3D Preview -->
+  <div class="viewer-wrap">
+    <model-viewer id="viewer" src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
+      ios-src="https://developer.apple.com/augmented-reality/quick-look/models/drummertoy/toy_drummer.usdz"
+      alt="3D AR object" auto-rotate camera-controls ar ar-modes="quick-look scene-viewer webxr" ar-scale="fixed"
+      environment-image="neutral" shadow-intensity="1.2" shadow-softness="0.8" exposure="1.1"
+      loading="eager"></model-viewer>
+  </div>
 
-  if (!supported) {
-    // Fallback: 3D preview mode (non-AR)
-    document.getElementById('not-supported').style.display = 'block';
-    document.getElementById('not-supported').innerHTML = `
-      ⚠️ Таны төхөөрөмж WebXR AR дэмжихгүй байна.<br>
-      <strong>3D Preview Mode</strong>-д орж байна…
-    `;
-    setTimeout(() => startFallback3D(), 1800);
-    return;
-  }
+  <!-- AR Launch Button -->
+  <a class="ar-btn" id="ar-btn" href="#" onclick="launchAR(event)">
+    <span class="ar-icon">⬡</span>
+    AR-д нээх — ширээн дээр харах
+  </a>
 
-  try {
-    xrSession = await navigator.xr.requestSession('immersive-ar', {
-      requiredFeatures: ['hit-test'],
-      optionalFeatures: ['dom-overlay', 'light-estimation'],
-      domOverlay: { root: document.getElementById('hud') }
-    });
-    initThreeJS(xrSession);
-    await initHitTest(xrSession);
-    document.getElementById('splash').style.display = 'none';
-    document.getElementById('hud').style.display = 'block';
-    document.getElementById('scan-lines').classList.add('visible');
-    document.getElementById('corners').style.display = 'block';
-  } catch(e) {
-    console.warn('AR session failed:', e);
-    startFallback3D();
-  }
-}
+  <div id="unsupported">
+    ⚠️ Таны браузер AR дэмжихгүй байна. iPhone дээр Safari-г ашиглана уу.
+  </div>
 
-// ════════════════════════════════════════════
-//  THREE.JS INIT
-// ════════════════════════════════════════════
-function initThreeJS(session) {
-  clock = new THREE.Clock();
+  <!-- iOS steps -->
+  <div class="steps">
+    <h3>// Алхамууд</h3>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text"><strong>Объект сонго</strong> — дээрх картуудаас хүссэнээ дарна уу</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text"><strong>"AR-д нээх" товч дар</strong> — iOS AR Quick Look нээгдэнэ</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text"><strong>Камераа ширээ рүү чиглүүл</strong> — гадаргуу илрүүлнэ (шар шугам гарна)</div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-text"><strong>Объект автоматаар байрлана</strong> — хөдөлгөх, томруулах, эргүүлэх боломжтой</div>
+    </div>
+  </div>
 
-  // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
-  renderer.xr.enabled = true;
-  document.body.appendChild(renderer.domElement);
+  <div class="ios-note">
+    <p>
+      <strong>iOS AR Quick Look</strong> нь Apple-ийн native ARKit ашигладаг тул
+      marker хэрэггүй, ширээ/шал/хана дээр бодит мэт тогтвортой харагдана.<br /><br />
+      Өөрийн GLB/USDZ файл ашиглахдаа <code>src</code> болон <code>ios-src</code>-г
+      өөрчлөх хэрэгтэй. HTTPS сервер дээр байршуулсан байх ёстой.
+    </p>
+  </div>
 
-  if (session) renderer.xr.setSession(session);
+  <script>
+    const viewer = document.getElementById('viewer');
+    const arBtn = document.getElementById('ar-btn');
+    const cards = document.querySelectorAll('.obj-card');
 
-  // Scene
-  scene = new THREE.Scene();
+    let currentModel = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
+    let currentUSDZ = 'https://developer.apple.com/augmented-reality/quick-look/models/drummertoy/toy_drummer.usdz';
 
-  // Camera
-  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+    function selectObj(card, name) {
+      cards.forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
 
-  // ── Lighting ──
-  ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambientLight);
+      currentModel = card.dataset.model;
+      currentUSDZ = card.dataset.usdz;
 
-  directionalLight = new THREE.DirectionalLight(0xfff5e0, 2.5);
-  directionalLight.position.set(0.5, 1.2, 0.8);
-  directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.set(1024, 1024);
-  directionalLight.shadow.camera.near = 0.01;
-  directionalLight.shadow.camera.far = 5;
-  directionalLight.shadow.bias = -0.001;
-  scene.add(directionalLight);
-
-  fillLight = new THREE.DirectionalLight(0x8080ff, 0.8);
-  fillLight.position.set(-0.5, 0.5, -0.8);
-  scene.add(fillLight);
-
-  // ── Reticle (surface indicator ring) ──
-  const reticleGeo = new THREE.RingGeometry(0.045, 0.06, 40);
-  reticleGeo.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
-
-  const reticleMat = new THREE.MeshBasicMaterial({
-    color: CONFIG.reticleColor,
-    transparent: true,
-    opacity: 0.85,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-
-  reticle = new THREE.Mesh(reticleGeo, reticleMat);
-  reticle.visible = false;
-  reticle.matrixAutoUpdate = false;
-  scene.add(reticle);
-
-  // Inner dot
-  const dotGeo = new THREE.CircleGeometry(0.01, 20);
-  dotGeo.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
-  const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
-  const dot = new THREE.Mesh(dotGeo, dotMat);
-  reticle.add(dot);
-
-  // Shadow receiver plane
-  const shadowGeo = new THREE.PlaneGeometry(0.6, 0.6);
-  shadowGeo.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
-  const shadowMat = new THREE.ShadowMaterial({ opacity: CONFIG.shadowOpacity });
-  shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
-  shadowMesh.receiveShadow = true;
-  shadowMesh.visible = false;
-  scene.add(shadowMesh);
-
-  // Start render loop
-  renderer.setAnimationLoop(onXRFrame);
-}
-
-// ════════════════════════════════════════════
-//  HIT TEST SETUP
-// ════════════════════════════════════════════
-async function initHitTest(session) {
-  session.addEventListener('end', onSessionEnd);
-  referenceSpace = await session.requestReferenceSpace('local');
-  const viewerSpace = await session.requestReferenceSpace('viewer');
-  hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-}
-
-// ════════════════════════════════════════════
-//  MAIN XR FRAME LOOP
-// ════════════════════════════════════════════
-function onXRFrame(timestamp, frame) {
-  frameCount++;
-  const delta = clock.getDelta();
-  const elapsed = clock.getElapsedTime();
-
-  if (frame && hitTestSource) {
-    const hitTestResults = frame.getHitTestResults(hitTestSource);
-
-    if (hitTestResults.length > 0) {
-      const hit = hitTestResults[0];
-      const pose = hit.getPose(referenceSpace);
-
-      reticle.visible = true;
-      reticle.matrix.fromArray(pose.transform.matrix);
-      reticle.updateMatrixWorld(true);
-
-      // Animate reticle
-      const scale = 0.9 + 0.1 * Math.sin(elapsed * 4);
-      reticle.scale.setScalar(scale);
-      reticle.material.opacity = 0.7 + 0.15 * Math.sin(elapsed * 3);
-
-      if (!surfaceDetected) {
-        surfaceDetected = true;
-        setSurfaceFound();
-      }
-
-      // Update shadow position
-      shadowMesh.position.setFromMatrixPosition(reticle.matrixWorld);
-
-    } else {
-      reticle.visible = objectPlaced ? false : false;
+      viewer.setAttribute('src', currentModel);
+      viewer.setAttribute('ios-src', currentUSDZ);
     }
-  }
 
-  // Animate placed objects
-  placedObjects.forEach((obj, i) => {
-    const phase = i * (Math.PI / 3);
-    obj.position.y = obj.userData.baseY +
-      Math.sin(elapsed * CONFIG.floatSpeed + phase) * CONFIG.floatAmplitude;
-    obj.rotation.y += delta * CONFIG.rotateSpeed;
+    function launchAR(e) {
+      e.preventDefault();
 
-    // Entrance scale animation
-    if (obj.userData.entranceTime) {
-      const t = (elapsed - obj.userData.entranceTime) / 0.6;
-      if (t < 1) {
-        const ease = 1 - Math.pow(1 - Math.min(t, 1), 3);
-        obj.scale.setScalar(CONFIG.objectScale * ease);
+      // iOS: model-viewer ar button дуудах
+      const arButton = viewer.querySelector('[slot="ar-button"]');
+
+      // model-viewer internal AR activate
+      if (viewer.canActivateAR) {
+        viewer.activateAR();
       } else {
-        obj.userData.entranceTime = null;
-        obj.scale.setScalar(CONFIG.objectScale);
+        // iOS Safari fallback: USDZ шууд нээх = AR Quick Look
+        const a = document.createElement('a');
+        a.href = currentUSDZ;
+        a.rel = 'ar';
+        const img = document.createElement('img');
+        img.src = '';
+        a.appendChild(img);
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 500);
       }
     }
-  });
 
-  renderer.render(scene, camera);
-}
+    // Check AR support
+    window.addEventListener('load', () => {
+      // model-viewer will handle iOS AR Quick Look natively
+      // For non-iOS show unsupported hint
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
 
-// ════════════════════════════════════════════
-//  PLACE OBJECT
-// ════════════════════════════════════════════
-function placeObject() {
-  if (!surfaceDetected) return;
-
-  const pos = new THREE.Vector3();
-  pos.setFromMatrixPosition(reticle.matrixWorld);
-
-  const mesh = buildModel(currentModelType);
-  mesh.position.copy(pos);
-  mesh.userData.baseY = pos.y;
-  mesh.userData.entranceTime = clock.getElapsedTime();
-  mesh.scale.setScalar(0);
-  mesh.castShadow = true;
-  scene.add(mesh);
-  placedObjects.push(mesh);
-
-  // Move shadow under new object
-  shadowMesh.position.copy(pos);
-  shadowMesh.visible = true;
-
-  // Reticle pulse
-  flashReticle();
-
-  objectPlaced = true;
-  setObjectPlaced();
-
-  document.getElementById('placeBtn').classList.add('placed');
-  document.getElementById('hint-text').textContent = '다시 눌러 더 추가 | Дахин дарж нэмэх';
-}
-
-// ════════════════════════════════════════════
-//  MODEL BUILDER
-// ════════════════════════════════════════════
-function buildModel(type) {
-  let geo;
-  const mats = {
-    box: new THREE.MeshStandardMaterial({
-      color: 0x2266ff,
-      roughness: 0.2,
-      metalness: 0.8,
-      envMapIntensity: 1.0,
-    }),
-    sphere: new THREE.MeshStandardMaterial({
-      color: 0x00e5cc,
-      roughness: 0.05,
-      metalness: 0.95,
-    }),
-    torus: new THREE.MeshStandardMaterial({
-      color: 0xff4d88,
-      roughness: 0.15,
-      metalness: 0.75,
-    }),
-  };
-
-  if (type === 'box') {
-    geo = new THREE.BoxGeometry(1, 1, 1, 2, 2, 2);
-  } else if (type === 'sphere') {
-    geo = new THREE.SphereGeometry(0.6, 32, 32);
-  } else {
-    geo = new THREE.TorusGeometry(0.6, 0.22, 20, 60);
-  }
-
-  const mesh = new THREE.Mesh(geo, mats[type]);
-  mesh.castShadow = true;
-
-  // Subtle edge glow effect via emissive
-  mats[type].emissive = new THREE.Color(0x001133);
-  mats[type].emissiveIntensity = 0.15;
-
-  return mesh;
-}
-
-// ════════════════════════════════════════════
-//  UI HELPERS
-// ════════════════════════════════════════════
-function setSurfaceFound() {
-  const bar = document.getElementById('status-bar');
-  bar.className = 'ready';
-  document.getElementById('status-text').textContent = 'Гадаргуу илэрлээ · Дарж байрлуул';
-  document.getElementById('hint-text').textContent = 'Товчийг дарж object байрлуул';
-}
-
-function setObjectPlaced() {
-  const bar = document.getElementById('status-bar');
-  bar.className = 'placed';
-  document.getElementById('status-text').textContent = 'Object байрлуулсан ✓';
-}
-
-function flashReticle() {
-  reticle.material.color.set(0xffffff);
-  setTimeout(() => reticle.material.color.set(CONFIG.reticleColor), 150);
-}
-
-function selectModel(type) {
-  currentModelType = type;
-  document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-}
-
-function exitAR() {
-  if (xrSession) xrSession.end();
-  else location.reload();
-}
-
-function onSessionEnd() {
-  document.getElementById('hud').style.display = 'none';
-  document.getElementById('scan-lines').classList.remove('visible');
-  document.getElementById('corners').style.display = 'none';
-  if (renderer?.domElement) renderer.domElement.remove();
-  document.getElementById('splash').style.display = 'flex';
-}
-
-// ════════════════════════════════════════════
-//  FALLBACK: 3D PREVIEW (non-AR browsers)
-// ════════════════════════════════════════════
-function startFallback3D() {
-  document.getElementById('splash').style.display = 'none';
-  document.getElementById('hud').style.display = 'block';
-  document.getElementById('corners').style.display = 'block';
-  document.getElementById('status-text').textContent = '3D Preview Mode';
-  document.getElementById('status-bar').className = 'ready';
-
-  clock = new THREE.Clock();
-
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.setClearColor(0x0d0d1a, 1);
-  document.body.insertBefore(renderer.domElement, document.getElementById('hud'));
-
-  scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x0d0d1a, 4, 12);
-
-  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 20);
-  camera.position.set(0, 0.6, 1.4);
-  camera.lookAt(0, 0, 0);
-
-  // Lights
-  scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-  const dLight = new THREE.DirectionalLight(0xfff5e0, 2.5);
-  dLight.position.set(1, 2, 1.5);
-  dLight.castShadow = true;
-  scene.add(dLight);
-  const fLight = new THREE.DirectionalLight(0x8888ff, 1);
-  fLight.position.set(-1, 0.5, -1);
-  scene.add(fLight);
-
-  // Floor / table surface
-  const floorGeo = new THREE.PlaneGeometry(2.5, 2.5);
-  floorGeo.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
-  const floorMat = new THREE.MeshStandardMaterial({
-    color: 0x1a1a2e,
-    roughness: 0.7,
-    metalness: 0.1,
-  });
-  const floor = new THREE.Mesh(floorGeo, floorMat);
-  floor.position.y = -0.15;
-  floor.receiveShadow = true;
-  scene.add(floor);
-
-  // Grid on floor
-  const grid = new THREE.GridHelper(2.5, 20, 0x333355, 0x1a1a2e);
-  grid.position.y = -0.149;
-  scene.add(grid);
-
-  // Shadow receiver
-  const sMat = new THREE.ShadowMaterial({ opacity: 0.4 });
-  shadowMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8).applyMatrix4(
-    new THREE.Matrix4().makeRotationX(-Math.PI / 2)
-  ), sMat);
-  shadowMesh.position.y = -0.148;
-  shadowMesh.receiveShadow = true;
-  scene.add(shadowMesh);
-
-  // Auto-place a model
-  surfaceDetected = true;
-  currentModelType = 'box';
-  const mesh = buildModel('box');
-  mesh.position.set(0, 0, 0);
-  mesh.userData.baseY = 0;
-  mesh.userData.entranceTime = clock.getElapsedTime();
-  mesh.scale.setScalar(0);
-  scene.add(mesh);
-  placedObjects.push(mesh);
-
-  // Reticle (visual only)
-  const rGeo = new THREE.RingGeometry(0.09, 0.12, 40).applyMatrix4(
-    new THREE.Matrix4().makeRotationX(-Math.PI / 2)
-  );
-  reticle = new THREE.Mesh(rGeo, new THREE.MeshBasicMaterial({ color: 0x00ccff, transparent: true, opacity: 0.7 }));
-  reticle.position.y = -0.147;
-  scene.add(reticle);
-
-  // Orbit camera mouse drag
-  let drag = false, lastX = 0, theta = 0;
-  renderer.domElement.addEventListener('mousedown', e => { drag = true; lastX = e.clientX; });
-  window.addEventListener('mouseup', () => drag = false);
-  window.addEventListener('mousemove', e => {
-    if (!drag) return;
-    theta += (e.clientX - lastX) * 0.008;
-    lastX = e.clientX;
-  });
-
-  // Touch drag
-  renderer.domElement.addEventListener('touchstart', e => { lastX = e.touches[0].clientX; });
-  renderer.domElement.addEventListener('touchmove', e => {
-    theta += (e.touches[0].clientX - lastX) * 0.008;
-    lastX = e.touches[0].clientX;
-  });
-
-  document.getElementById('hint-text').textContent = '3D Preview · Хуруугаараа эргүүл';
-
-  renderer.setAnimationLoop(() => {
-    const delta = clock.getDelta();
-    const elapsed = clock.getElapsedTime();
-
-    // Orbit camera
-    camera.position.x = Math.sin(theta) * 1.4;
-    camera.position.z = Math.cos(theta) * 1.4;
-    camera.lookAt(0, 0, 0);
-
-    // Animate objects
-    placedObjects.forEach((obj, i) => {
-      obj.position.y = (obj.userData.baseY || 0) +
-        Math.sin(elapsed * CONFIG.floatSpeed + i) * CONFIG.floatAmplitude;
-      obj.rotation.y += delta * CONFIG.rotateSpeed;
-
-      if (obj.userData.entranceTime) {
-        const t = (elapsed - obj.userData.entranceTime) / 0.7;
-        if (t < 1) {
-          const ease = 1 - Math.pow(1 - Math.min(t, 1), 3);
-          obj.scale.setScalar(CONFIG.objectScale * ease);
-        } else {
-          obj.userData.entranceTime = null;
-          obj.scale.setScalar(CONFIG.objectScale);
-        }
+      if (!isIOS && !isAndroid) {
+        document.getElementById('unsupported').style.display = 'block';
+        arBtn.style.opacity = '0.4';
+        arBtn.style.pointerEvents = 'none';
       }
     });
-
-    reticle.rotation.y += delta * 0.8;
-    renderer.render(scene, camera);
-  });
-
-  // Wire up buttons for fallback
-  document.getElementById('placeBtn').onclick = () => {
-    const mesh = buildModel(currentModelType);
-    const angle = Math.random() * Math.PI * 2;
-    const r = 0.1 + Math.random() * 0.15;
-    mesh.position.set(Math.cos(angle)*r, 0, Math.sin(angle)*r);
-    mesh.userData.baseY = 0;
-    mesh.userData.entranceTime = clock.getElapsedTime();
-    mesh.scale.setScalar(0);
-    scene.add(mesh);
-    placedObjects.push(mesh);
-  };
-
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-}
-
-// Resize handler for XR
-window.addEventListener('resize', () => {
-  if (!renderer || renderer.xr.isPresenting) return;
-  if (camera) {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-  }
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-</script>
+  </script>
 </body>
+
 </html>
